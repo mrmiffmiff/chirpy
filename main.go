@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
+	platform       string
 }
 
 func main() {
@@ -28,6 +29,7 @@ func main() {
 	cfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
 		dbQueries:      dbQueries,
+		platform:       os.Getenv("PLATFORM"),
 	}
 
 	const filePathRoot = "."
@@ -38,6 +40,7 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(handlerFileserver))
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 	mux.HandleFunc("POST /api/validate_chirp", handlerChirpValidation)
+	mux.HandleFunc("POST /api/users", cfg.handlerPostUsers)
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
 
