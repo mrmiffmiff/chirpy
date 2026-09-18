@@ -21,9 +21,9 @@ func main() {
 	}
 	handlerFileserver := http.StripPrefix("/app", http.FileServer(http.Dir(filePathRoot)))
 	mux.Handle("/app/", cfg.middlewareMetricsInc(handlerFileserver))
-	mux.HandleFunc("/healthz", handlerReadiness)
-	mux.HandleFunc("/metrics", cfg.handlerMetrics)
-	mux.HandleFunc("/reset", cfg.handlerReset)
+	mux.HandleFunc("GET /healthz", handlerReadiness)
+	mux.HandleFunc("GET /metrics", cfg.handlerMetrics)
+	mux.HandleFunc("POST /reset", cfg.handlerReset)
 
 	server := &http.Server{
 		Handler: mux,
@@ -37,7 +37,7 @@ func main() {
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	hitString := fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load())
+	hitString := fmt.Sprintf("Hits: %d\n", cfg.fileserverHits.Load())
 	w.Write([]byte(hitString))
 }
 
