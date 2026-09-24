@@ -27,13 +27,6 @@ type chirpResponseBody struct {
 }
 
 func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	requestBody := postChirpReqBody{}
-	err := decoder.Decode(&requestBody)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
-		return
-	}
 	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
@@ -42,6 +35,13 @@ func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
 	userid, err := auth.ValidateJWT(token, cfg.secret)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	requestBody := postChirpReqBody{}
+	err = decoder.Decode(&requestBody)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
 		return
 	}
 

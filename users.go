@@ -18,9 +18,8 @@ type usersPostReqBody struct {
 }
 
 type usersLoginReqBody struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	Expiration int    `json:"expires_in_seconds"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type UserPostResBody struct {
@@ -36,6 +35,7 @@ type LoginResBody struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
 	Token     string    `json:"token"`
+	Refresh   string    `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
@@ -89,16 +89,20 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
-	var expirationTime time.Duration
-	if requestBody.Expiration < 1 || (time.Duration(requestBody.Expiration)*time.Second) > time.Hour {
-		expirationTime = 1 * time.Hour
-	} else {
-		expirationTime = time.Duration(requestBody.Expiration) * time.Second
-	}
-	jwt, err := auth.MakeJWT(user.ID, cfg.secret, expirationTime)
+	jwt, err := auth.MakeJWT(user.ID, cfg.secret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, fmt.Errorf("Something went wrong creating JWT: %w", err).Error())
 		return
+	}
+	refresh, err := cfg.dbQueries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token: auth.MakeRefreshToken(),
+		UserID: uuid.NullUUID{
+			UUID:  user.ID,
+			Valid: true,
+		},
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, fmt.Errorf("Problem inserting new refresh token into database: %w", err).Error())
 	}
 	localUser := LoginResBody{
 		ID:        user.ID,
@@ -106,6 +110,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
 		Token:     jwt,
+		Refresh:   refresh,
 	}
 	respondWithJSON(w, http.StatusOK, localUser)
 }
