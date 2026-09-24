@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
 	platform       string
+	secret         string
 }
 
 func main() {
@@ -30,6 +31,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		dbQueries:      dbQueries,
 		platform:       os.Getenv("PLATFORM"),
+		secret:         os.Getenv("JWTSECRET"),
 	}
 
 	const filePathRoot = "."

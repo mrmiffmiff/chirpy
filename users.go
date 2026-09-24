@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -11,21 +12,35 @@ import (
 	"github.com/mrmiffmiff/chirpy/internal/database"
 )
 
-type usersPostOrLoginReqBody struct {
+type usersPostReqBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-type User struct {
+type usersLoginReqBody struct {
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Expiration int    `json:"expires_in_seconds"`
+}
+
+type UserPostResBody struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
 }
 
+type LoginResBody struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+	Token     string    `json:"token"`
+}
+
 func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	requestBody := usersPostOrLoginReqBody{}
+	requestBody := usersPostReqBody{}
 	err := decoder.Decode(&requestBody)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
@@ -47,7 +62,7 @@ func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong creating a new user in the database")
 		return
 	}
-	localUser := User{
+	localUser := UserPostResBody{
 		ID:        newUser.ID,
 		CreatedAt: newUser.CreatedAt,
 		UpdatedAt: newUser.UpdatedAt,
@@ -58,7 +73,7 @@ func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	requestBody := usersPostOrLoginReqBody{}
+	requestBody := usersLoginReqBody{}
 	err := decoder.Decode(&requestBody)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
@@ -74,11 +89,23 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
-	localUser := User{
+	var expirationTime time.Duration
+	if requestBody.Expiration < 1 || (time.Duration(requestBody.Expiration)*time.Second) > time.Hour {
+		expirationTime = 1 * time.Hour
+	} else {
+		expirationTime = time.Duration(requestBody.Expiration) * time.Second
+	}
+	jwt, err := auth.MakeJWT(user.ID, cfg.secret, expirationTime)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, fmt.Errorf("Something went wrong creating JWT: %w", err).Error())
+		return
+	}
+	localUser := LoginResBody{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+		Token:     jwt,
 	}
 	respondWithJSON(w, http.StatusOK, localUser)
 }

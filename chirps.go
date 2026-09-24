@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mrmiffmiff/chirpy/internal/auth"
 	"github.com/mrmiffmiff/chirpy/internal/database"
 )
 
 type postChirpReqBody struct {
-	Body   string    `json:"body"`
-	UserID uuid.UUID `json:"user_id"`
+	Body string `json:"body"`
 }
 
 type chirpResponseBody struct {
@@ -34,6 +34,17 @@ func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
 		return
 	}
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	userid, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
 	if len(requestBody.Body) > 140 {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
 		return
@@ -51,7 +62,7 @@ func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
 		Body: cleaned,
 		UserID: uuid.NullUUID{
 			Valid: true,
-			UUID:  requestBody.UserID,
+			UUID:  userid,
 		},
 	})
 	if err != nil {
