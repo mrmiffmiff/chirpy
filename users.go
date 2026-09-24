@@ -17,12 +17,17 @@ type usersPostReqBody struct {
 	Password string `json:"password"`
 }
 
+type usersPutChangeEmailAndPasswordBody struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type usersLoginReqBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-type UserPostResBody struct {
+type UserPostOrPutResBody struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -62,13 +67,56 @@ func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong creating a new user in the database")
 		return
 	}
-	localUser := UserPostResBody{
+	localUser := UserPostOrPutResBody{
 		ID:        newUser.ID,
 		CreatedAt: newUser.CreatedAt,
 		UpdatedAt: newUser.UpdatedAt,
 		Email:     newUser.Email,
 	}
 	respondWithJSON(w, http.StatusCreated, localUser)
+}
+
+func (cfg *apiConfig) handlerPutUsers(w http.ResponseWriter, r *http.Request) {
+	access, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	userId, err := auth.ValidateJWT(access, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	requestBody := usersPutChangeEmailAndPasswordBody{}
+	err = decoder.Decode(&requestBody)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong with decoding the request")
+		return
+	}
+	hashedPass, err := auth.HashPassword(requestBody.Password)
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong with hashing the password")
+		return
+	}
+	user, err := cfg.dbQueries.UpdateUserEmailAndPassword(r.Context(), database.UpdateUserEmailAndPasswordParams{
+		ID:             userId,
+		Email:          requestBody.Email,
+		HashedPassword: hashedPass,
+	})
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong updating user in database")
+		return
+	}
+	localUser := UserPostOrPutResBody{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	}
+	respondWithJSON(w, http.StatusOK, localUser)
 }
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
