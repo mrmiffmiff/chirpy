@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -122,10 +123,29 @@ func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.dbQueries.GetChirps(r.Context())
+	authorID := r.URL.Query().Get("author_id")
+	var chirps []database.Chirp
+	var err error
+	if authorID == "" {
+		chirps, err = cfg.dbQueries.GetChirps(r.Context())
+	} else {
+		authorIDasUUID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Something went wrong parsing Author ID in query")
+			return
+		}
+		chirps, err = cfg.dbQueries.GetChirpsByAuthor(r.Context(), uuid.NullUUID{
+			UUID:  authorIDasUUID,
+			Valid: true,
+		})
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong retrieving chirps.")
 		return
+	}
+	sortDirection := r.URL.Query().Get("sort")
+	if sortDirection == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
 	}
 	resChirps := make([]chirpResponseBody, len(chirps))
 	for i, chirp := range chirps {
