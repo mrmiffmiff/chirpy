@@ -28,19 +28,21 @@ type usersLoginReqBody struct {
 }
 
 type UserPostOrPutResBody struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 type LoginResBody struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
-	Refresh   string    `json:"refresh_token"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	Token       string    `json:"token"`
+	Refresh     string    `json:"refresh_token"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
@@ -68,10 +70,11 @@ func (cfg *apiConfig) handlerPostUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	localUser := UserPostOrPutResBody{
-		ID:        newUser.ID,
-		CreatedAt: newUser.CreatedAt,
-		UpdatedAt: newUser.UpdatedAt,
-		Email:     newUser.Email,
+		ID:          newUser.ID,
+		CreatedAt:   newUser.CreatedAt,
+		UpdatedAt:   newUser.UpdatedAt,
+		Email:       newUser.Email,
+		IsChirpyRed: newUser.IsChirpyRed.Valid && newUser.IsChirpyRed.Bool,
 	}
 	respondWithJSON(w, http.StatusCreated, localUser)
 }
@@ -111,10 +114,11 @@ func (cfg *apiConfig) handlerPutUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	localUser := UserPostOrPutResBody{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed.Valid && user.IsChirpyRed.Bool,
 	}
 	respondWithJSON(w, http.StatusOK, localUser)
 }
@@ -153,12 +157,13 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, fmt.Errorf("Problem inserting new refresh token into database: %w", err).Error())
 	}
 	localUser := LoginResBody{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     jwt,
-		Refresh:   refresh,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		Token:       jwt,
+		Refresh:     refresh,
+		IsChirpyRed: user.IsChirpyRed.Valid && user.IsChirpyRed.Bool,
 	}
 	respondWithJSON(w, http.StatusOK, localUser)
 }
